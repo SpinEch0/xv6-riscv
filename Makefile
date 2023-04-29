@@ -32,7 +32,7 @@ OBJS = \
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
-#TOOLPREFIX = 
+#TOOLPREFIX =
 
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
@@ -56,7 +56,7 @@ LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -gdwarf-2 -march=rv64g
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
@@ -73,8 +73,8 @@ endif
 
 LDFLAGS = -z max-page-size=4096
 
-$K/kernel: $(OBJS) $K/kernel.ld $U/initcode
-	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) 
+$K/kernel: $(OBJS) $K/kernel.ld $U/initcode $K/entry $K/kernelvec $K/swtch $K/trampoline
+	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS)
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
 
@@ -83,6 +83,18 @@ $U/initcode: $U/initcode.S
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
 	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
 	$(OBJDUMP) -S $U/initcode.o > $U/initcode.asm
+
+$K/kernelvec: $K/kernelvec.S
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $K/kernelvec.S -o $K/kernelvec.o
+
+$K/entry: $K/entry.S
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $K/entry.S -o $K/entry.o
+
+$K/swtch: $K/swtch.S
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $K/swtch.S -o $K/swtch.o
+
+$K/trampoline: $K/trampoline.S
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $K/trampoline.S -o $K/trampoline.o
 
 tags: $(OBJS) _init
 	etags *.S *.c
@@ -138,7 +150,7 @@ fs.img: mkfs/mkfs README $(UPROGS)
 
 -include kernel/*.d user/*.d
 
-clean: 
+clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
 	$U/initcode $U/initcode.out $K/kernel fs.img \
